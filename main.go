@@ -2,11 +2,16 @@ package main
 
 // IO
 import (
+	"booking-app/helper"
 	"fmt"
 	"strings"
 )
 
-// globals
+// global level scope
+// use capitalize var name
+// eg. ConferenceName
+
+// package level scope
 // syntatic sugar for init var with type inference
 var conferenceName = "Go Conference"
 
@@ -40,21 +45,10 @@ func main() {
 
 		firstName, lastName, emailAddress, userTickets := getUserInput()
 
-		// validate names, names have to be > than 2 chars
-		isValidName := len(firstName) >= 2 && len(lastName) >= 2
-		// checks if string contains an @
-		isValidEmail := strings.Contains(emailAddress, "@")
-		isValidTicketNumber := userTickets > 0
-		if !isValidName {
-			fmt.Printf(("invalid first or last name\n"))
-			continue
-		} else if !isValidEmail {
-			fmt.Printf(("invalid email\n"))
-			continue
-		} else if !isValidTicketNumber {
-			fmt.Printf(("invalid ticket number\n"))
+		if !helper.ValidateUserInput(firstName, lastName, emailAddress, userTickets) {
 			continue
 		}
+
 		// validate ticket count
 		for userTickets > remainingTickets {
 			fmt.Printf("We only have %v tickets remaining, so you can't book %v tickets\n", remainingTickets, userTickets)
