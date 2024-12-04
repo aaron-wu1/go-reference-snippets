@@ -4,7 +4,7 @@ package main
 import (
 	"booking-app/helper"
 	"fmt"
-	"strings"
+	"strconv"
 )
 
 // global level scope
@@ -30,7 +30,11 @@ var remainingTickets uint = 50
 
 // Slice - array without explicit size
 // dynamic array
-var bookings []string
+// with make guarrentees acesss to a map
+var bookings = make([]map[string]string, 0)
+
+// init as nil, bad practice
+// var bookings []map[string]string
 
 func main() {
 
@@ -73,7 +77,7 @@ func greetUsers() {
 func getFirstNames() []string {
 	firstNames := []string{}
 	for _, booking := range bookings {
-		firstNames = append(firstNames, strings.Fields(booking)[0])
+		firstNames = append(firstNames, booking["firstName"])
 	}
 	return firstNames
 }
@@ -99,8 +103,18 @@ func bookTicket(userTickets uint, firstName string, lastName string, emailAddres
 	// add to booking
 	// bookings[0] = firstName + " " + lastName
 	// adding using slice
-	bookings = append(bookings, firstName+" "+lastName)
+	// bookings = append(bookings, firstName+" "+lastName)
 
+	// using map
+	// create empty map with make
+	var userData = make(map[string]string)
+	userData["firstName"] = firstName
+	userData["lastName"] = lastName
+	userData["emailAddress"] = emailAddress
+	// converts uint to uint64 to string
+	userData["userTickets"] = strconv.FormatUint(uint64(userTickets), 10)
+	bookings = append(bookings, userData)
+	fmt.Printf("List of bookings is %v\n", bookings)
 	// // has spaces, represents the rest of the array, doesn't splice out whitespace
 	// fmt.Printf("The whole array: %v\n", bookings)
 	// fmt.Printf("The first value: %v\n", bookings[0])
