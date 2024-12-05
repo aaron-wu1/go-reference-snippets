@@ -4,7 +4,8 @@ package main
 import (
 	"booking-app/helper"
 	"fmt"
-	"strconv"
+	"sync"
+	"time"
 )
 
 // global level scope
@@ -30,41 +31,58 @@ var remainingTickets uint = 50
 
 // Slice - array without explicit size
 // dynamic array
-// with make guarrentees acesss to a map
-var bookings = make([]map[string]string, 0)
+var bookings = make([]UserData, 0)
+
+// // with make guarrentees acesss to a map
+// var bookings = make([]map[string]string, 0)
+
+// userdata struct
+type UserData struct {
+	firstName    string
+	lastName     string
+	emailAddress string
+	userTickets  uint
+}
 
 // init as nil, bad practice
 // var bookings []map[string]string
+
+var wg = sync.WaitGroup{}
 
 func main() {
 
 	greetUsers()
 
-	for {
-		if remainingTickets == 0 {
-			// end program
-			fmt.Println("Our conference is booked out. Come back next year.")
-			break
-		}
-
-		firstName, lastName, emailAddress, userTickets := getUserInput()
-
-		if !helper.ValidateUserInput(firstName, lastName, emailAddress, userTickets) {
-			continue
-		}
-
-		// validate ticket count
-		for userTickets > remainingTickets {
-			fmt.Printf("We only have %v tickets remaining, so you can't book %v tickets\n", remainingTickets, userTickets)
-			fmt.Printf("Enter a new ticket number\n")
-			fmt.Scan(&userTickets)
-		}
-
-		bookTicket(userTickets, firstName, lastName, emailAddress)
-
-		firstNames := getFirstNames()
-		fmt.Printf("The first names of bookings are: %v\n", firstNames)
+	// for {
+	if remainingTickets == 0 {
+		// end program
+		fmt.Println("Our conference is booked out. Come back next year.")
+		// break
 	}
+
+	firstName, lastName, emailAddress, userTickets := getUserInput()
+
+	if !helper.ValidateUserInput(firstName, lastName, emailAddress, userTickets) {
+		// continue
+	}
+
+	// validate ticket count
+	for userTickets > remainingTickets {
+		fmt.Printf("We only have %v tickets remaining, so you can't book %v tickets\n", remainingTickets, userTickets)
+		fmt.Printf("Enter a new ticket number\n")
+		fmt.Scan(&userTickets)
+	}
+
+	bookTicket(userTickets, firstName, lastName, emailAddress)
+	// add to wait group
+	wg.Add(1)
+	go sendTicket(userTickets, firstName, lastName, emailAddress)
+
+	firstNames := getFirstNames()
+	fmt.Printf("The first names of bookings are: %v\n", firstNames)
+	// }
+	// waits for all threads to be done
+	wg.Wait()
 }
 
 func greetUsers() {
@@ -77,7 +95,7 @@ func greetUsers() {
 func getFirstNames() []string {
 	firstNames := []string{}
 	for _, booking := range bookings {
-		firstNames = append(firstNames, booking["firstName"])
+		firstNames = append(firstNames, booking.firstName)
 	}
 	return firstNames
 }
@@ -107,12 +125,20 @@ func bookTicket(userTickets uint, firstName string, lastName string, emailAddres
 
 	// using map
 	// create empty map with make
-	var userData = make(map[string]string)
-	userData["firstName"] = firstName
-	userData["lastName"] = lastName
-	userData["emailAddress"] = emailAddress
-	// converts uint to uint64 to string
-	userData["userTickets"] = strconv.FormatUint(uint64(userTickets), 10)
+	// var userData = make(map[string]string)
+	// userData["firstName"] = firstName
+	// userData["lastName"] = lastName
+	// userData["emailAddress"] = emailAddress
+	// // converts uint to uint64 to string
+	// userData["userTickets"] = strconv.FormatUint(uint64(userTickets), 10)
+
+	//using struct
+	var userData = UserData{
+		firstName:    firstName,
+		lastName:     lastName,
+		emailAddress: emailAddress,
+		userTickets:  userTickets,
+	}
 	bookings = append(bookings, userData)
 	fmt.Printf("List of bookings is %v\n", bookings)
 	// // has spaces, represents the rest of the array, doesn't splice out whitespace
@@ -132,4 +158,15 @@ func bookTicket(userTickets uint, firstName string, lastName string, emailAddres
 
 	fmt.Printf("Thank you %v %v booked %v tickets.\nYou will recieve a confirmation email at %v\n", firstName, lastName, userTickets, emailAddress)
 	fmt.Printf("%v tickets remaining for %v\n", remainingTickets, conferenceName)
+}
+
+func sendTicket(userTickets uint, firstName string, lastName string, emailAddress string) {
+	// assume is a slow process simulate with sleep
+	time.Sleep(10 * time.Second)
+	var ticket = fmt.Sprintf("%v tickets for %v %v", userTickets, firstName, lastName)
+	fmt.Println("###########################")
+	fmt.Printf("Sending ticket %v to email address %v\n", ticket, emailAddress)
+	fmt.Println("###########################")
+	// removes thread from wait group
+	wg.Done()
 }
