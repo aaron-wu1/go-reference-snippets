@@ -11,7 +11,7 @@ import (
 )
 
 // cache for dedup urls
-type URLs struct {
+type fetchState struct {
 	crawled map[string]bool
 	mux     sync.Mutex
 }
@@ -25,60 +25,77 @@ type Fetcher interface {
 // GOAL: Don't fetch the same URL twice.
 // create a URL cache that checks if a url as been crawled
 // needs to have locks for each url to prevent concurrency issues
-// init URLs cache
-var u URLs = URLs{crawled: make(map[string]bool)}
 
-func (u URLs) isCrawled(url string) bool {
-	u.mux.Lock()
+func (fs *fetchState) isCrawled(url string) bool {
+	fs.mux.Lock()
 	// usage of defer here to run after func completion
-	defer u.mux.Unlock()
+	defer fs.mux.Unlock()
 
 	// if url not crawled
-	if _, ok := u.crawled[url]; ok == false {
+	if _, ok := fs.crawled[url]; ok == false {
 		return false
 	}
 	return true
 }
 
-func (u URLs) setCrawled(url string) {
-	u.mux.Lock()
-	u.crawled[url] = true
-	u.mux.Unlock()
+func (fs *fetchState) setCrawled(url string) {
+	fs.mux.Lock()
+	defer fs.mux.Unlock()
+	fs.crawled[url] = true
+}
+
+func (fs *fetchState) testAndSet(url string) bool {
+	fs.mux.Lock()
+	defer fs.mux.Unlock()
+	r := fs.crawled[url]
+	fs.crawled[url] = true
+	return r
 }
 
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
-func Crawl(url string, depth int, fetcher Fetcher, wg *sync.WaitGroup) {
-	defer wg.Done()
+// func Crawl(url string, depth int, fetcher Fetcher, wg *sync.WaitGroup) {
+func Crawl(url string, depth int, fetcher Fetcher, fs *fetchState) {
+	// defer wg.Done()
 	// Check if already crawled
-	if u.isCrawled(url) == true {
+	if fs.isCrawled(url) == true {
 		return
 	}
 	if depth <= 0 {
 		return
 	}
-	body, urls, err := fetcher.Fetch(url)
+	_, urls, err := fetcher.Fetch(url)
 	// Marked as crawled, doesn't retry on error
-	u.setCrawled(url)
+	fs.setCrawled(url)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Printf("found: %s %q\n", url, body)
+
+	var done sync.WaitGroup
 	for _, u := range urls {
-		wg.Add(1)
-		go Crawl(u, depth-1, fetcher, wg)
+		// wg.Add(1)
+		done.Add(1)
+		// go Crawl(u, depth-1, fetcher)
+		go func(u string) {
+			Crawl(u, depth-1, fetcher, fs)
+			done.Done()
+		}(u)
 	}
+	done.Wait()
 	return
+}
+
+func makeState() *fetchState {
+	return &fetchState{crawled: make(map[string]bool)}
 }
 
 func main() {
 	// GOAL: Fetch URLs in parallel.
 	// use wait group to store all crawl calls, and wait for completion
-	wg := &sync.WaitGroup{}
-	wg.Add(1) // add one for first call to go Crawl, wg.Done() decrements
-	go Crawl("https://golang.org/", 4, fetcher, wg)
-	wg.Wait()
+	fmt.Println(("Starting web crawler"))
+	Crawl("https://golang.org/", 4, fetcher, makeState())
+	fmt.Println(("Finished web crawler"))
 }
 
 // fakeFetcher is Fetcher that returns canned results.
@@ -91,6 +108,7 @@ type fakeResult struct {
 
 func (f fakeFetcher) Fetch(url string) (string, []string, error) {
 	if res, ok := f[url]; ok {
+		fmt.Printf("found:   %s\n", url)
 		return res.body, res.urls, nil
 	}
 	return "", nil, fmt.Errorf("not found: %s", url)
